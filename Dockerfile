@@ -19,7 +19,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV TRANSPORT=http
 # PORT is injected by Cloud Run at runtime (default 8080)
-ENV PORT=8080
+ENV PORT=3000
 
 # Copy only prod deps
 COPY package*.json ./
@@ -32,5 +32,5 @@ COPY --from=builder /app/dist ./dist
 RUN addgroup -S mcpgrp && adduser -S mcpuser -G mcpgrp
 USER mcpuser
 
-EXPOSE 8080
+EXPOSE 3000
 CMD ["node", "dist/index.js"]

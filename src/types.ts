@@ -1,71 +1,82 @@
 // ── types.ts ──────────────────────────────────────────────────────
-// Shared TypeScript interfaces mirroring the AviationStack response
+// Shared TypeScript interfaces mirroring AeroDataBox responses
 
-export interface FlightAirport {
-  airport: string | null;
-  timezone: string | null;
-  iata: string | null;
-  icao: string | null;
-  terminal: string | null;
-  gate: string | null;
-  delay: number | null;
-  scheduled: string | null;
-  estimated: string | null;
-  actual: string | null;
-  estimated_runway: string | null;
-  actual_runway: string | null;
+// ── AeroDataBox FIDS (arrivals/departures board) ─────────────────
+export interface AdbAirport {
+  icao?: string;
+  iata?: string;
+  name?: string;
+  shortName?: string;
+  municipalityName?: string;
+  location?: { lat: number; lon: number };
+  countryCode?: string;
 }
 
-export interface FlightAirline {
-  name: string | null;
-  iata: string | null;
-  icao: string | null;
+export interface AdbTimepoint {
+  utc?: string;
+  local?: string;
 }
 
-export interface FlightAircraft {
-  registration: string | null;
-  iata: string | null;
-  icao: string | null;
-  icao24: string | null;
+export interface AdbFlightLeg {
+  airport: AdbAirport;
+  scheduledTime?: AdbTimepoint;
+  estimatedTime?: AdbTimepoint;
+  actualTime?: AdbTimepoint;
+  runwayTime?: AdbTimepoint;
+  terminal?: string;
+  gate?: string;
+  baggageBelt?: string;
+  delay?: number;         // minutes
+  checkInDesk?: string;
 }
 
-export interface FlightLive {
-  updated: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  altitude: number | null;
-  direction: number | null;
-  speed_horizontal: number | null;
-  speed_vertical: number | null;
-  is_ground: boolean;
+export interface AdbAirline {
+  name?: string;
+  iata?: string;
+  icao?: string;
 }
 
-export interface Flight {
-  flight_date: string | null;
-  flight_status: string | null;
-  departure: FlightAirport;
-  arrival: FlightAirport;
-  airline: FlightAirline;
-  flight: {
-    number: string | null;
-    iata: string | null;
-    icao: string | null;
-  };
-  aircraft: FlightAircraft | null;
-  live: FlightLive | null;
+export interface AdbAircraft {
+  reg?: string;
+  modeS?: string;
+  model?: string;
+  image?: { url?: string };
 }
 
-export interface AviationStackResponse {
-  pagination: {
-    limit: number;
-    offset: number;
-    count: number;
-    total: number;
-  };
-  data: Flight[];
+export interface AdbFlight {
+  number: string;           // e.g. "AA100"
+  callSign?: string;
+  status?: string;          // e.g. "Landed", "EnRoute", "Scheduled", "Cancelled"
+  codeshareStatus?: string;
+  isCargo?: boolean;
+  aircraft?: AdbAircraft;
+  airline?: AdbAirline;
+  departure?: AdbFlightLeg;
+  arrival?: AdbFlightLeg;
+  greatCircleDistance?: { km: number; mile: number };
 }
 
-/** Normalised flight row returned by our tools. */
+export interface AdbFidsResponse {
+  arrivals?: AdbFlight[];
+  departures?: AdbFlight[];
+}
+
+// ── AeroDataBox Flight Status (single flight) ────────────────────
+export interface AdbLiveData {
+  updated?: string;
+  latitude?: number;
+  longitude?: number;
+  altitude?: { feet?: number; meters?: number };
+  speed?: { horizontal?: number; vertical?: number; isGround?: boolean };
+  track?: number;
+  callSign?: string;
+}
+
+export interface AdbFlightStatusItem extends AdbFlight {
+  live?: AdbLiveData;
+}
+
+// ── Normalised summary (tool output) ────────────────────────────
 export interface FlightSummary {
   flight_iata: string | null;
   airline: string | null;
@@ -86,5 +97,6 @@ export interface FlightSummary {
   arrival_gate: string | null;
   departure_delay_min: number | null;
   arrival_delay_min: number | null;
-  aircraft_iata: string | null;
+  aircraft_model: string | null;
+  aircraft_reg: string | null;
 }

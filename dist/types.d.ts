@@ -1,62 +1,82 @@
-export interface FlightAirport {
-    airport: string | null;
-    timezone: string | null;
-    iata: string | null;
-    icao: string | null;
-    terminal: string | null;
-    gate: string | null;
-    delay: number | null;
-    scheduled: string | null;
-    estimated: string | null;
-    actual: string | null;
-    estimated_runway: string | null;
-    actual_runway: string | null;
-}
-export interface FlightAirline {
-    name: string | null;
-    iata: string | null;
-    icao: string | null;
-}
-export interface FlightAircraft {
-    registration: string | null;
-    iata: string | null;
-    icao: string | null;
-    icao24: string | null;
-}
-export interface FlightLive {
-    updated: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    altitude: number | null;
-    direction: number | null;
-    speed_horizontal: number | null;
-    speed_vertical: number | null;
-    is_ground: boolean;
-}
-export interface Flight {
-    flight_date: string | null;
-    flight_status: string | null;
-    departure: FlightAirport;
-    arrival: FlightAirport;
-    airline: FlightAirline;
-    flight: {
-        number: string | null;
-        iata: string | null;
-        icao: string | null;
+export interface AdbAirport {
+    icao?: string;
+    iata?: string;
+    name?: string;
+    shortName?: string;
+    municipalityName?: string;
+    location?: {
+        lat: number;
+        lon: number;
     };
-    aircraft: FlightAircraft | null;
-    live: FlightLive | null;
+    countryCode?: string;
 }
-export interface AviationStackResponse {
-    pagination: {
-        limit: number;
-        offset: number;
-        count: number;
-        total: number;
+export interface AdbTimepoint {
+    utc?: string;
+    local?: string;
+}
+export interface AdbFlightLeg {
+    airport: AdbAirport;
+    scheduledTime?: AdbTimepoint;
+    estimatedTime?: AdbTimepoint;
+    actualTime?: AdbTimepoint;
+    runwayTime?: AdbTimepoint;
+    terminal?: string;
+    gate?: string;
+    baggageBelt?: string;
+    delay?: number;
+    checkInDesk?: string;
+}
+export interface AdbAirline {
+    name?: string;
+    iata?: string;
+    icao?: string;
+}
+export interface AdbAircraft {
+    reg?: string;
+    modeS?: string;
+    model?: string;
+    image?: {
+        url?: string;
     };
-    data: Flight[];
 }
-/** Normalised flight row returned by our tools. */
+export interface AdbFlight {
+    number: string;
+    callSign?: string;
+    status?: string;
+    codeshareStatus?: string;
+    isCargo?: boolean;
+    aircraft?: AdbAircraft;
+    airline?: AdbAirline;
+    departure?: AdbFlightLeg;
+    arrival?: AdbFlightLeg;
+    greatCircleDistance?: {
+        km: number;
+        mile: number;
+    };
+}
+export interface AdbFidsResponse {
+    arrivals?: AdbFlight[];
+    departures?: AdbFlight[];
+}
+export interface AdbLiveData {
+    updated?: string;
+    latitude?: number;
+    longitude?: number;
+    altitude?: {
+        feet?: number;
+        meters?: number;
+    };
+    speed?: {
+        horizontal?: number;
+        vertical?: number;
+        isGround?: boolean;
+    };
+    track?: number;
+    callSign?: string;
+}
+export interface AdbFlightStatusItem extends AdbFlight {
+    live?: AdbLiveData;
+}
 export interface FlightSummary {
     flight_iata: string | null;
     airline: string | null;
@@ -77,6 +97,7 @@ export interface FlightSummary {
     arrival_gate: string | null;
     departure_delay_min: number | null;
     arrival_delay_min: number | null;
-    aircraft_iata: string | null;
+    aircraft_model: string | null;
+    aircraft_reg: string | null;
 }
 //# sourceMappingURL=types.d.ts.map

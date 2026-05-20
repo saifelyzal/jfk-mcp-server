@@ -3,101 +3,67 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerArrivalsTools = registerArrivalsTools;
 const zod_1 = require("zod");
 const constants_js_1 = require("../constants.js");
-const aviationstack_js_1 = require("../services/aviationstack.js");
-const index_js_1 = require("../schemas/index.js");
-const ArrivalsInputSchema = zod_1.z
-    .object({
-    airline_iata: zod_1.z
-        .string()
-        .length(2)
-        .toUpperCase()
-        .optional()
+const aerodatabox_js_1 = require("../services/aerodatabox.js");
+const ArrivalsInputSchema = zod_1.z.object({
+    airline_iata: zod_1.z.string().length(2).toUpperCase().optional()
         .describe("Filter by airline IATA code, e.g. 'AA' for American Airlines"),
-})
-    .merge(index_js_1.FlightStatusFilterSchema)
-    .merge(index_js_1.DateSchema)
-    .merge(index_js_1.PaginationSchema)
-    .strict();
+    flight_date: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD").optional()
+        .describe("Date in YYYY-MM-DD format. Defaults to a 12-hour window from now."),
+    limit: zod_1.z.number().int().min(1).max(50).default(10)
+        .describe("Results to return (1–50, default 10)"),
+    offset: zod_1.z.number().int().min(0).default(0)
+        .describe("Pagination offset (default 0)"),
+}).strict();
 function registerArrivalsTools(server) {
     server.registerTool("jfk_get_arrivals", {
         title: "JFK Arrivals",
-        description: `Retrieve a list of arriving flights at JFK (John F. Kennedy International Airport).
+        description: `Retrieve arriving flights at JFK (John F. Kennedy International Airport).
 
-Returns scheduled, estimated, and actual arrival times, gate/terminal info, delay data, and live flight status.
+Returns scheduled, estimated, and actual arrival times, gate/terminal info, delay data, and flight status.
 
 Args:
+  - flight_date (string): YYYY-MM-DD date. Omit for current/upcoming arrivals.
+  - airline_iata (string): Two-letter airline code e.g. "AA", "DL", "B6"
   - limit (number): Results per page, 1–50 (default 10)
   - offset (number): Pagination offset (default 0)
-  - status (string): Filter by status — scheduled | active | landed | cancelled | incident | diverted
-  - flight_date (string): Date in YYYY-MM-DD format (defaults to today)
-  - airline_iata (string): Two-letter airline code, e.g. "AA", "DL", "UA"
 
-Returns JSON array of arrival objects, each with:
-  - flight_iata, airline, status
-  - origin_iata, origin_name
-  - scheduled_arrival, estimated_arrival, actual_arrival
-  - arrival_terminal, arrival_gate, arrival_delay_min
-  - aircraft_iata
+Returns JSON array each with: flight_iata, airline, status, origin_iata, origin_name,
+scheduled/estimated/actual arrival times, arrival_terminal, arrival_gate, arrival_delay_min, aircraft_model.
 
-Example use cases:
-  - "What flights are arriving at JFK today?" → call with no filters
-  - "Show me Delta arrivals at JFK" → airline_iata="DL"
-  - "Which JFK arrivals are delayed?" → status="active" then check delay fields
-  - "JFK arrivals for 2025-07-04" → flight_date="2025-07-04"`,
+Examples:
+  - "Flights arriving at JFK today?" → no filters
+  - "Delta arrivals at JFK?" → airline_iata="DL"
+  - "JFK arrivals on April 20?" → flight_date="2026-04-20"`,
         inputSchema: ArrivalsInputSchema,
-        annotations: {
-            readOnlyHint: true,
-            destructiveHint: false,
-            idempotentHint: true,
-            openWorldHint: true,
-        },
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     }, async (params) => {
         try {
-            const query = {
-                arr_iata: constants_js_1.JFK_IATA,
-                limit: params.limit,
-                offset: params.offset,
-            };
-            if (params.status)
-                query["flight_status"] = params.status;
-            if (params.flight_date)
-                query["flight_date"] = params.flight_date;
-            if (params.airline_iata)
-                query["airline_iata"] = params.airline_iata;
-            const data = await (0, aviationstack_js_1.fetchFlights)("flights", query);
-            const flights = data.data.map(aviationstack_js_1.normaliseFlight);
-            if (flights.length === 0) {
+            const { from, to } = (0, aerodatabox_js_1.buildWindow)(params.flight_date);
+            const flights = await (0, aerodatabox_js_1.fetchFids)(constants_js_1.JFK_ICAO, from, to, "Arrival", params.airline_iata);
+            const paged = flights.slice(params.offset, params.offset + params.limit);
+            if (paged.length === 0) {
                 return {
-                    content: [
-                        {
-                            type: "text",
-                            text: "No arriving flights found at JFK matching the given filters.",
-                        },
-                    ],
+                    content: [{ type: "text", text: "No arriving flights found at JFK matching the given filters." }],
                 };
             }
+            const summaries = paged.map(aerodatabox_js_1.normaliseFlight);
             const output = {
                 airport: "JFK – John F. Kennedy International",
-                pagination: data.pagination,
-                flights,
+                window: { from, to },
+                total: flights.length,
+                returned: paged.length,
+                offset: params.offset,
+                flights: summaries,
             };
-            // Build human-readable text
-            let text = `## JFK Arrivals (${flights.length} of ${data.pagination.total})\n\n`;
-            text += flights.map(aviationstack_js_1.formatFlightMarkdown).join("\n\n");
-            if (text.length > constants_js_1.CHARACTER_LIMIT) {
+            let text = `## JFK Arrivals (${paged.length} of ${flights.length}) · ${from} → ${to}\n\n`;
+            text += summaries.map(aerodatabox_js_1.formatFlightMarkdown).join("\n\n");
+            if (text.length > constants_js_1.CHARACTER_LIMIT)
                 text = text.slice(0, constants_js_1.CHARACTER_LIMIT) + "\n\n…(truncated)";
-            }
-            return {
-                content: [{ type: "text", text }],
-                structuredContent: output,
-            };
+            return { content: [{ type: "text", text }], structuredContent: output };
         }
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return {
-                content: [{ type: "text", text: `Error fetching JFK arrivals: ${msg}` }],
-                isError: true,
-            };
+            return { content: [{ type: "text", text: `Error fetching JFK arrivals: ${msg}` }], isError: true };
         }
     });
 }
